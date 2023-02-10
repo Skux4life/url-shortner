@@ -1,0 +1,55 @@
+service: urlshortner
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  region: ap-southeast-2
+  environment:
+    DYNAMODB_URLSHORTNER_TABLE: ${self:service}-table-${sls:stage}
+    API_URL: {
+      "Fn::Join": [
+        "",
+        [
+          "https://",
+          { Ref: "HttpApi" },
+          ".execute-api.${self:provider.region}.amazonaws.com",
+        ],
+      ],
+    }
+  iam:
+    role:
+      statements:
+        - Effect: 'Allow'
+          Action:
+            - 'dynamodb:PutItem'
+            - 'dynamodb:Get*'
+          Resource: arn:aws:dynamodb:${aws:region}:${aws:accountId}:table/${self:service}-table-${sls:stage}
+
+functions:
+  set:
+    handler: functions/seturl.handler
+    events:
+      - httpApi:
+          path: /set
+          method: post
+  get:
+    handler: functions/geturl.handler
+    events:
+      - httpApi:
+          path: /get/{param}
+          method: get
+
+resources:
+  Resources:
+    CustomerTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: primary_key
+            AttributeType: N
+        BillingMode: PAY_PER_REQUEST
+        KeySchema:
+          - AttributeName: primary_key
+            KeyType: HASH
+        TableName: ${self:service}-table-${sls:stage}
